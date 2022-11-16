@@ -1,0 +1,13 @@
+[package]
+authors = ["Team La Fine Bouche"]
+description = "Rust backend implementation for La Fine Bouche"
+edition = "2021"
+homepage = "lafinebouche.xyz"
+license-file = "LICENSE"
+name = "lfb-back"
+readme = "README.md"
+repository = "https://github.com/greged93/lfb-back"
+version = "0.0.1"
+
+[dependencies]
+rocket = "0.5.0-rc.2"
