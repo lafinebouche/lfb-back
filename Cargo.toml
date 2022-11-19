@@ -12,6 +12,7 @@ version = "0.0.1"
 [dependencies]
 rocket = "0.5.0-rc.2"
 serde = "1.0.147" # Used in the Map Data into Structs section
+thiserror = "1.0.37"
 
 [dependencies.mongodb]
 version = "2.3.1"

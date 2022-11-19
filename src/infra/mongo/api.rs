@@ -1,29 +1,40 @@
-use mongodb::{bson::doc, sync::Client};
+use super::types::{Ingredient, Recipe};
+use mongodb::{bson::doc, error::Error as mongoError, sync::Client};
 use std::error::Error;
+use thiserror::Error;
 
-pub struct MongoRep {
-    pub ingredients: mongodb::Collection<Ingredient>,
-    pub recipes: mongodb::Collection<Recipe>,
+#[derive(Error, Debug)]
+pub enum MongoRepError {
+    #[error("error querying value")]
+    QueryError(#[from] mongoError),
+    #[error("missing ingredient {0}")]
+    InvalidIngredientName(String),
 }
 
-fn connect(uri: String) {}
+pub struct MongoRep {
+    pub ingredients: mongodb::sync::Collection<Ingredient>,
+    pub recipes: mongodb::sync::Collection<Recipe>,
+}
 
-fn main() -> Result<(), Box<dyn Error>> {
-    // Load the MongoDB connection string from an environment variable:
-    // Careful ! You need to export your connection string here!
-
-    // A Client is needed to connect to MongoDB:
-    // An extra line of code to work around a DNS issue on Windows:
-    let options =
-        ClientOptions::parse_with_resolver_config(&client_uri, ResolverConfig::cloudflare())
-            .await?;
-    let client = Client::with_options(options)?;
-
-    // Print the databases in our MongoDB cluster:
-    println!("Databases:");
-    for name in client.list_database_names(None, None).await? {
-        println!("- {}", name);
+impl MongoRep {
+    fn init(uri: String, data: &str) -> Result<Self, Box<dyn Error>> {
+        let client = Client::with_uri_str(uri)?;
+        let database = client.database(data);
+        let rep = MongoRep {
+            ingredients: database.collection("ingredients"),
+            recipes: database.collection("recipes"),
+        };
+        return Ok(rep);
     }
 
-    Ok(())
+    fn get_ingredient(self, name: String) -> Result<Ingredient, MongoRepError> {
+        match self
+            .ingredients
+            .find_one(doc! {"name": &name}, None)
+            .map_err(MongoRepError::from)?
+        {
+            Some(ing) => Ok(ing),
+            _ => Err(MongoRepError::InvalidIngredientName(name)),
+        }
+    }
 }
