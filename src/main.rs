@@ -1,3 +1,5 @@
+mod infra;
+
 #[macro_use]
 extern crate rocket;
 
