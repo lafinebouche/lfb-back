@@ -1,16 +1,17 @@
-use rocket::http::Status;
-
 mod infra;
+
+use infra::*;
+use rocket::{http::Status, serde::json::Json, State};
 
 #[macro_use]
 extern crate rocket;
 
 #[get("/ingredient/<id>")]
-fn get_ingredient(db: &State<MongoRepo>, id: String) -> Result<Json<Ingredient>, Status> {
+fn get_ingredient(db: &State<MongoRep>, id: String) -> Result<Json<Ingredient>, Status> {
     if id.is_empty() {
         return Err(Status::BadRequest);
     };
-    let result = db.getIngredient(&id);
+    let result = db.get_ingredient(id);
 
     match result {
         Ok(ingredient) => Ok(Json(ingredient)),
@@ -18,20 +19,19 @@ fn get_ingredient(db: &State<MongoRepo>, id: String) -> Result<Json<Ingredient>,
     }
 }
 
-#[get("/recipes/<ids>")]
-fn get_recipes(db: &State<MongodRepo>, ids: Vec<String>) -> Result<Vec<Json<Recipe>>, Status> {
-    let result = db.get_recipes(ingredients);
+// #[get("/recipes/<ids>")]
+// fn get_recipes(db: &State<MongodRepo>, ids: Vec<String>) -> Result<Vec<Json<Recipe>>, Status> {
+//     let result = db.get_recipes(ingredients);
 
-    match result {
-        Ok(recipes) => Ok(Json(recipes)),
-        Err(_) => Err(Status::InternalServerError),
-    }
-}
+//     match result {
+//         Ok(recipes) => Ok(Json(recipes)),
+//         Err(_) => Err(Status::InternalServerError),
+//     }
+// }
 
 #[launch]
 fn rocket() -> _ {
-    let db = MongoRepo::init();
-    rocket::build()
-        .manage(db)
-        .mount("/", routes![get_ingredient, get_recipes])
+    let db = MongoRep::init(String::from(""), "");
+    rocket::build().manage(db)
+    // .mount("/", routes![get_ingredient, get_recipes])
 }
