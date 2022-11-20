@@ -1,7 +1,10 @@
+use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Ingredient {
+    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+    pub id: Option<ObjectId>,
     pub domain: String,
     // TODO change from string to hex string
     pub hash: String,
@@ -11,5 +14,14 @@ pub struct Ingredient {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Recipe {
-    pub ingredients: Vec<Ingredient>,
+    // TODO change from string to hex string
+    pub address: String,
+    pub status: Status,
+    pub ingredients: Vec<ObjectId>,
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+pub enum Status {
+    Initiated,
+    Completed,
 }

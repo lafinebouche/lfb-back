@@ -11,7 +11,7 @@ fn get_ingredient(db: &State<MongoRep>, id: String) -> Result<Json<Ingredient>, 
     if id.is_empty() {
         return Err(Status::BadRequest);
     };
-    let result = db.get_ingredient(id);
+    let result = db.get_ingredient(&id);
 
     match result {
         Ok(ingredient) => Ok(Json(ingredient)),
