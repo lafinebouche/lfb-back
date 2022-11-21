@@ -1,4 +1,4 @@
-use super::types::{Ingredient, Recipe};
+use super::types::{DbIngredient, Ingredient, Recipe};
 use mongodb::{
     bson::{doc, oid::ObjectId},
     error::Error as mongoError,
@@ -17,6 +17,8 @@ pub enum MongoRepError {
     InvalidIngredientsList(),
     #[error("incorrect ingredients list {0}, expected between 2 and 6 ingredients")]
     IncorrectIngredientsLength(usize),
+    #[error("empty response")]
+    EmptyResponse(),
 }
 
 pub struct MongoRep {
@@ -56,6 +58,7 @@ impl MongoRep {
             .map_err(MongoRepError::from)?;
         match cursor.collect::<Result<Vec<Ingredient>, mongoError>>() {
             Ok(v) if v.len() > 0 => Ok(v),
+            Ok(_) => Err(MongoRepError::EmptyResponse()),
             _ => Err(MongoRepError::InvalidIngredientsList()),
         }
     }
@@ -66,19 +69,20 @@ impl MongoRep {
             return Err(MongoRepError::IncorrectIngredientsLength(len));
         }
         let ingredients = self.get_ingredients(ingredients)?;
-        let ids: Vec<ObjectId> = ingredients
+        let ids: Vec<mongodb::bson::Document> = ingredients
             .into_iter()
             //TODO improve the handling of None
             .map(|x| x.id.unwrap_or_else(|| ObjectId::new()))
+            .map(|x| doc! { "$elemMatch": {"id": x} })
             .collect();
-        dbg!(doc! {"ingredients": {"$all": &ids}});
         let cursor = self
             .recipes
             .find(doc! {"ingredients": {"$all": ids}}, None)
             .map_err(MongoRepError::from)?;
         match cursor.collect::<Result<Vec<Recipe>, mongoError>>() {
             Ok(v) if v.len() > 0 => Ok(v),
-            _ => Err(MongoRepError::InvalidIngredientsList()),
+            Ok(_) => Err(MongoRepError::EmptyResponse()),
+            Err(e) => Err(MongoRepError::InvalidIngredientsList()),
         }
     }
 }
@@ -113,13 +117,13 @@ mod tests {
         let ingredient = mongo_rep.get_ingredient("abricot.eth").unwrap();
         assert_eq!("abricot.eth", ingredient.domain);
         assert_eq!(
-            mongodb::bson::oid::ObjectId::from_str("637a1703c6df275f8fb1e472").unwrap(),
+            mongodb::bson::oid::ObjectId::from_str("637be8b4942c929a6d8710c9").unwrap(),
             ingredient.id.unwrap()
         )
     }
 
     #[test]
-    #[should_panic(expected = "InvalidIngredientsList")]
+    #[should_panic(expected = "EmptyResponse")]
     fn test_get_ingredients_invalid_ingredient_query() {
         let mongo_rep = init_repo("lfb");
         mongo_rep.get_ingredients(vec!["hello.eth"]).unwrap();
@@ -143,7 +147,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "InvalidIngredientsList")]
+    #[should_panic(expected = "EmptyResponse")]
     fn test_get_recipe_invalid_ingredients_query() {
         let mongo_rep = init_repo("lfb");
         mongo_rep
@@ -158,6 +162,6 @@ mod tests {
             .get_recipe(vec!["agaragar.eth", "asperge.eth"])
             .unwrap();
         assert_eq!(recipe[0].address, "0x12345");
-        assert_eq!(recipe[0].status, Status::Initiated);
+        assert_eq!(recipe[0].status, Status::Ongoing);
     }
 }
