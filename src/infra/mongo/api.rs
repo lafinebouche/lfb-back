@@ -1,9 +1,11 @@
 use super::types::{DbIngredient, Ingredient, Recipe};
 use mongodb::{
-    bson::{doc, oid::ObjectId},
+    bson::{doc, oid::ObjectId, to_bson, to_document},
     error::Error as mongoError,
+    results::InsertOneResult,
     sync::Client,
 };
+use rocket::futures::future::MapErr;
 use std::error::Error;
 use thiserror::Error;
 
@@ -19,6 +21,8 @@ pub enum MongoRepError {
     IncorrectIngredientsLength(usize),
     #[error("empty response")]
     EmptyResponse(),
+    #[error("could not add ingredient {0} to db")]
+    InvalidAddIngredient(String),
 }
 
 pub struct MongoRep {
@@ -35,6 +39,25 @@ impl MongoRep {
             recipes: database.collection("recipes"),
         };
         return Ok(rep);
+    }
+
+    pub fn add_ingredient_mock(&self, domain: &str) -> Result<InsertOneResult, MongoRepError> {
+        let new_ingredient = Ingredient {
+            id: None,
+            domain: domain.to_string(),
+            hash: "random_hash".to_string(),
+        };
+
+        match self
+            .ingredients
+            .insert_one(new_ingredient, None)
+            .map_err(MongoRepError::from)
+        {
+            Ok(result) => Ok(result),
+            Err(_) => Err(MongoRepError::InvalidIngredientName(String::from(
+                domain.to_string(),
+            ))),
+        }
     }
 
     pub fn get_ingredient(&self, name: &str) -> Result<Ingredient, MongoRepError> {
@@ -114,10 +137,11 @@ mod tests {
     #[test]
     fn test_get_ingredient_passes() {
         let mongo_rep = init_repo("lfb");
+        let insert = mongo_rep.add_ingredient_mock("abricot.eth").unwrap();
         let ingredient = mongo_rep.get_ingredient("abricot.eth").unwrap();
         assert_eq!("abricot.eth", ingredient.domain);
         assert_eq!(
-            mongodb::bson::oid::ObjectId::from_str("637be8b4942c929a6d8710c9").unwrap(),
+            insert.inserted_id.as_object_id().unwrap(),
             ingredient.id.unwrap()
         )
     }
