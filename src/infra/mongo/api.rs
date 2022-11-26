@@ -78,8 +78,7 @@ impl MongoRep {
             .find(doc! {"domain": {"$in": ingredients}}, None)
             .map_err(MongoRepError::from)?;
         match cursor.collect::<Result<Vec<Ingredient>, mongoError>>() {
-            Ok(v) if v.len() > 0 => Ok(v),
-            Ok(_) => Err(MongoRepError::EmptyResponse()),
+            Ok(v) => Ok(v),
             _ => Err(MongoRepError::InvalidIngredientsList()),
         }
     }
