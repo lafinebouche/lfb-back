@@ -109,7 +109,6 @@ impl MongoRep {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
 
     use crate::infra::mongo::types::Status;
 
