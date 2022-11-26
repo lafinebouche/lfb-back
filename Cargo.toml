@@ -13,7 +13,10 @@ version = "0.0.1"
 rocket = {version="0.5.0-rc.2", features=["json"]}
 serde = "1.0.147" # Used in the Map Data into Structs section
 thiserror = "1.0.37"
+merkletree = "0.22.1"
+sha3 = "0.10.6"
 
 [dependencies.mongodb]
 version = "2.3.1"
-features = ["tokio-sync"]
+default-features = false
+features = ["sync"]

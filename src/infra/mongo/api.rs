@@ -1,12 +1,10 @@
-use super::types::{DbIngredient, Ingredient, Recipe};
+use super::types::{Ingredient, Recipe};
 use mongodb::{
-    bson::{doc, oid::ObjectId, to_bson, to_document},
+    bson::{doc, oid::ObjectId},
     error::Error as mongoError,
     results::InsertOneResult,
     sync::Client,
 };
-use rocket::futures::future::MapErr;
-use std::error::Error;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -86,7 +84,7 @@ impl MongoRep {
         }
     }
 
-    pub fn get_recipe(&self, ingredients: Vec<&str>) -> Result<Vec<Recipe>, MongoRepError> {
+    pub fn get_recipes(&self, ingredients: Vec<&str>) -> Result<Vec<Recipe>, MongoRepError> {
         let len = ingredients.len();
         if len > 6 || len < 2 {
             return Err(MongoRepError::IncorrectIngredientsLength(len));
@@ -103,8 +101,7 @@ impl MongoRep {
             .find(doc! {"ingredients": {"$all": ids}}, None)
             .map_err(MongoRepError::from)?;
         match cursor.collect::<Result<Vec<Recipe>, mongoError>>() {
-            Ok(v) if v.len() > 0 => Ok(v),
-            Ok(_) => Err(MongoRepError::EmptyResponse()),
+            Ok(v) => Ok(v),
             Err(e) => Err(MongoRepError::InvalidIngredientsList()),
         }
     }
@@ -167,7 +164,7 @@ mod tests {
     #[should_panic(expected = "IncorrectIngredientsLength")]
     fn test_get_recipe_incorrect_ingredients_list_length() {
         let mongo_rep = init_repo("lfb");
-        mongo_rep.get_recipe(vec!["hello.eth"]).unwrap();
+        mongo_rep.get_recipes(vec!["hello.eth"]).unwrap();
     }
 
     #[test]
@@ -175,7 +172,7 @@ mod tests {
     fn test_get_recipe_invalid_ingredients_query() {
         let mongo_rep = init_repo("lfb");
         mongo_rep
-            .get_recipe(vec!["hello.eth", "there.eth"])
+            .get_recipes(vec!["hello.eth", "there.eth"])
             .unwrap();
     }
 
@@ -183,7 +180,7 @@ mod tests {
     fn test_get_recipe_passes() {
         let mongo_rep = init_repo("lfb");
         let recipe = mongo_rep
-            .get_recipe(vec!["agaragar.eth", "asperge.eth"])
+            .get_recipes(vec!["agaragar.eth", "asperge.eth"])
             .unwrap();
         assert_eq!(recipe[0].address, "0x12345");
         assert_eq!(recipe[0].status, Status::Ongoing);
