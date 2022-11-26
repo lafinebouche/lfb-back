@@ -16,4 +16,5 @@ thiserror = "1.0.37"
 
 [dependencies.mongodb]
 version = "2.3.1"
-features = ["tokio-sync"]
+default-features = false
+features = ["sync"]

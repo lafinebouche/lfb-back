@@ -1,12 +1,10 @@
-use super::types::{DbIngredient, Ingredient, Recipe};
+use super::types::{Ingredient, Recipe};
 use mongodb::{
-    bson::{doc, oid::ObjectId, to_bson, to_document},
+    bson::{doc, oid::ObjectId},
     error::Error as mongoError,
     results::InsertOneResult,
     sync::Client,
 };
-use rocket::futures::future::MapErr;
-use std::error::Error;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -105,14 +103,13 @@ impl MongoRep {
         match cursor.collect::<Result<Vec<Recipe>, mongoError>>() {
             Ok(v) if v.len() > 0 => Ok(v),
             Ok(_) => Err(MongoRepError::EmptyResponse()),
-            Err(e) => Err(MongoRepError::InvalidIngredientsList()),
+            Err(_) => Err(MongoRepError::InvalidIngredientsList()),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
 
     use crate::infra::mongo::types::Status;
 
