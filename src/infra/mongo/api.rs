@@ -52,7 +52,7 @@ impl MongoRep {
             .map_err(MongoRepError::from)
         {
             Ok(result) => Ok(result),
-            Err(_) => Err(MongoRepError::InvalidIngredientName(String::from(
+            Err(_) => Err(MongoRepError::InvalidAddIngredient(String::from(
                 domain.to_string(),
             ))),
         }
