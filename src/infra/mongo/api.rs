@@ -44,6 +44,7 @@ impl MongoRep {
             id: None,
             domain: domain.to_string(),
             hash: "random_hash".to_string(),
+            path: ["random_path".to_string()].to_vec(),
         };
 
         match self

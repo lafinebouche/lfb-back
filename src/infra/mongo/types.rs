@@ -10,7 +10,7 @@ pub struct Ingredient {
     pub hash: String,
     // TODO change from string to hex string
     // TODO add merkle tree path
-    // pub path: Vec<String>,
+    pub path: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
