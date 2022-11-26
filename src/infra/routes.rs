@@ -18,7 +18,7 @@ pub fn get_ingredient(db: &State<MongoRep>, name: &str) -> Result<Json<Ingredien
 #[get("/recipes/<names>")]
 pub fn get_recipes(db: &State<MongoRep>, names: &str) -> Result<Json<Vec<Recipe>>, Status> {
     let names = names.split(',').collect();
-    let result = db.get_recipe(names);
+    let result = db.get_recipes(names);
 
     match result {
         Ok(recipes) => Ok(Json(recipes)),
