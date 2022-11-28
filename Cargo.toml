@@ -14,7 +14,10 @@ rocket = {version="0.5.0-rc.2", features=["json"]}
 serde = "1.0.147" # Used in the Map Data into Structs section
 thiserror = "1.0.37"
 merkletree = "0.22.1"
-sha3 = "0.10.6"
+tiny-keccak = { version = "2.0.2",  features = ["keccak"] }
+hex-literal = "0.3.4"
+hex = "0.4.3"
+typenum = "1.15.0"
 
 [dependencies.mongodb]
 version = "2.3.1"
