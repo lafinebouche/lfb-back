@@ -1,9 +1,10 @@
-use rocket::{http::Status, serde::json::Json, State};
-
 use super::{Ingredient, MongoRep, MongoRepError, Recipe};
+use rocket::get;
+use rocket::{http::Status, serde::json::Json, State};
 
 #[get("/ingredient/<name>")]
 pub fn get_ingredient(db: &State<MongoRep>, name: &str) -> Result<Json<Ingredient>, Status> {
+    println!("{}", name);
     if name.is_empty() {
         return Err(Status::BadRequest);
     };

@@ -1,5 +1,5 @@
-pub mod infra;
-pub use infra::*;
+mod infra;
+use infra::*;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::Header;
 use rocket::{Request, Response};
