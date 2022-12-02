@@ -1,4 +1,4 @@
-use super::types::{Ingredient, Recipe};
+use super::types::{DbIngredient, Ingredient, Recipe, Status};
 use mongodb::{
     bson::{doc, oid::ObjectId},
     error::Error as mongoError,
@@ -21,6 +21,10 @@ pub enum MongoRepError {
     EmptyResponse(),
     #[error("could not add ingredient {0} to db")]
     InvalidAddIngredient(String),
+    #[error("could not find ingredient from db")]
+    InvalidIngredientHash(),
+    #[error("could not add recipe to db")]
+    InvalidAddRecipe(),
 }
 
 pub struct MongoRep {
@@ -81,6 +85,49 @@ impl MongoRep {
         match cursor.collect::<Result<Vec<Ingredient>, mongoError>>() {
             Ok(v) => Ok(v),
             _ => Err(MongoRepError::InvalidIngredientsList()),
+        }
+    }
+
+    pub fn add_recipe(
+        &self,
+        address: &str,
+        hashes: Vec<&str>,
+    ) -> Result<InsertOneResult, MongoRepError> {
+        let ingredients = self.get_ingredients_by_hash(hashes).unwrap_or_default();
+        let ingredients = ingredients
+            .iter()
+            .map(|x| DbIngredient {
+                id: x.id.unwrap(),
+                status: Status::Ongoing,
+            })
+            .collect();
+        let new_recipe = Recipe {
+            address: address.to_string(),
+            status: Status::Ongoing,
+            ingredients: ingredients,
+        };
+
+        match self
+            .recipes
+            .insert_one(new_recipe, None)
+            .map_err(MongoRepError::from)
+        {
+            Ok(result) => Ok(result),
+            Err(_) => Err(MongoRepError::InvalidAddRecipe()),
+        }
+    }
+
+    pub fn get_ingredients_by_hash(
+        &self,
+        hashes: Vec<&str>,
+    ) -> Result<Vec<Ingredient>, MongoRepError> {
+        let cursor = self
+            .ingredients
+            .find(doc! {"hash": {"$in" : hashes}}, None)
+            .map_err(MongoRepError::from)?;
+        match cursor.collect::<Result<Vec<Ingredient>, mongoError>>() {
+            Ok(v) => Ok(v),
+            Err(e) => Err(MongoRepError::InvalidIngredientHash()),
         }
     }
 
@@ -183,5 +230,19 @@ mod tests {
             .unwrap();
         assert_eq!(recipe[0].address, "0x12345");
         assert_eq!(recipe[0].status, Status::Ongoing);
+    }
+
+    #[test]
+    fn test_get_ingredients_from_hash() {
+        let mongo_rep = init_repo("lfb");
+        let ingredients: Vec<Ingredient> = mongo_rep
+            .get_ingredients_by_hash(vec![
+                "0x8574ea6bd913dd9b95296e9e5cede2d361f64f9b4a2f641b5fae3a2948be331e",
+                "0xbb46ee301b409e685fdca2667a94deffe378f7081edb25cee0386dc0cd5c2aca",
+            ])
+            .unwrap();
+        // dbg!(ingredients)
+        assert_eq!(ingredients[0].domain, "abricot.eth");
+        assert_eq!(ingredients[1].domain, "agaragar.eth");
     }
 }
