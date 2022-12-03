@@ -20,12 +20,14 @@ pub enum MongoRepError {
     IncorrectIngredientsLength(usize),
     #[error("empty response")]
     EmptyResponse(),
-    #[error("could not add ingredient {0} to db")]
+    #[error("could not add ingredient {0} to database")]
     InvalidAddIngredient(String),
-    #[error("could not find ingredient from db")]
+    #[error("could not find ingredient from database")]
     InvalidIngredientHash(),
-    #[error("could not add recipe to db")]
+    #[error("could not add recipe to database")]
     InvalidAddRecipe(),
+    #[error("invalid update for recipe at {0}")]
+    InvalidUpdate(String),
 }
 
 pub struct MongoRep {
@@ -152,6 +154,27 @@ impl MongoRep {
             Err(_) => Err(MongoRepError::InvalidAddRecipe()),
         }
     }
+
+    pub fn update_recipe(
+        &self,
+        address: &str,
+        hash: &str,
+        block: u32,
+    ) -> Result<bool, MongoRepError> {
+        let ingredient = &self.get_ingredients_by_hash(vec![hash])?[0];
+        match self
+            .recipes
+            .update_one(
+                doc! {"address": address.to_string(), "ingredients.id": ingredient.id},
+                doc! {"$set": {"last_block": block, "ingredients.$.status": "Completed"}},
+                None,
+            )
+            .map_err(MongoRepError::from)
+        {
+            Ok(_) => Ok(true),
+            Err(_) => Err(MongoRepError::InvalidUpdate(address.to_string())),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -257,6 +280,18 @@ mod tests {
                 "0x1245425523",
                 ingredients.iter().map(|x| x.hash.as_str()).collect(),
                 1234,
+            )
+            .unwrap());
+    }
+
+    #[test]
+    fn test_update_recipe_passes() {
+        let mongo_rep = init_repo("lfb");
+        assert!(mongo_rep
+            .update_recipe(
+                "0x1245425523",
+                "0x8574ea6bd913dd9b95296e9e5cede2d361f64f9b4a2f641b5fae3a2948be331e",
+                12345,
             )
             .unwrap());
     }
