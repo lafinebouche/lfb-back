@@ -131,7 +131,7 @@ impl MongoRep {
         &self,
         address: &str,
         hashes: Vec<&str>,
-        block: u32,
+        block: i64,
     ) -> Result<bool, MongoRepError> {
         let ingredients = self.get_ingredients_by_hash(hashes).unwrap_or_default();
         let ingredients: Vec<mongodb::bson::Document> = ingredients
@@ -159,7 +159,7 @@ impl MongoRep {
         &self,
         address: &str,
         hash: &str,
-        block: u32,
+        block: i64,
     ) -> Result<bool, MongoRepError> {
         let ingredient = &self.get_ingredients_by_hash(vec![hash])?[0];
         match self
