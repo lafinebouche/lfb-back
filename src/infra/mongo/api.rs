@@ -2,6 +2,7 @@ use super::types::{DbIngredient, Ingredient, Recipe, Status};
 use mongodb::{
     bson::{doc, oid::ObjectId},
     error::Error as mongoError,
+    options::UpdateOptions,
     results::InsertOneResult,
     sync::Client,
 };
@@ -88,35 +89,6 @@ impl MongoRep {
         }
     }
 
-    pub fn add_recipe(
-        &self,
-        address: &str,
-        hashes: Vec<&str>,
-    ) -> Result<InsertOneResult, MongoRepError> {
-        let ingredients = self.get_ingredients_by_hash(hashes).unwrap_or_default();
-        let ingredients = ingredients
-            .iter()
-            .map(|x| DbIngredient {
-                id: x.id.unwrap(),
-                status: Status::Ongoing,
-            })
-            .collect();
-        let new_recipe = Recipe {
-            address: address.to_string(),
-            status: Status::Ongoing,
-            ingredients: ingredients,
-        };
-
-        match self
-            .recipes
-            .insert_one(new_recipe, None)
-            .map_err(MongoRepError::from)
-        {
-            Ok(result) => Ok(result),
-            Err(_) => Err(MongoRepError::InvalidAddRecipe()),
-        }
-    }
-
     pub fn get_ingredients_by_hash(
         &self,
         hashes: Vec<&str>,
@@ -133,7 +105,7 @@ impl MongoRep {
 
     pub fn get_recipes(&self, ingredients: Vec<&str>) -> Result<Vec<Recipe>, MongoRepError> {
         let len = ingredients.len();
-        if len > 6 || len < 2 {
+        if len >= 6 || len < 2 {
             return Err(MongoRepError::IncorrectIngredientsLength(len));
         }
         let ingredients = self.get_ingredients(ingredients)?;
@@ -150,6 +122,34 @@ impl MongoRep {
         match cursor.collect::<Result<Vec<Recipe>, mongoError>>() {
             Ok(v) => Ok(v),
             Err(e) => Err(MongoRepError::InvalidIngredientsList()),
+        }
+    }
+
+    pub fn add_recipe(
+        &self,
+        address: &str,
+        hashes: Vec<&str>,
+        block: u32,
+    ) -> Result<bool, MongoRepError> {
+        let ingredients = self.get_ingredients_by_hash(hashes).unwrap_or_default();
+        let ingredients: Vec<mongodb::bson::Document> = ingredients
+            .iter()
+            .map(|x| doc! {"id": x.id.unwrap(), "status": "Ongoing"})
+            .collect();
+
+        let mut option = UpdateOptions::default();
+        option.upsert = Some(true);
+        match self
+            .recipes
+            .update_one(
+                doc! {"address": address.to_string()},
+                doc! {"$setOnInsert": {"address": address.to_string(), "status": "Ongoing", "ingredients": ingredients, "last_block": block}},
+                option,
+            )
+            .map_err(MongoRepError::from)
+        {
+            Ok(_) => Ok(true),
+            Err(_) => Err(MongoRepError::InvalidAddRecipe()),
         }
     }
 }
@@ -207,6 +207,20 @@ mod tests {
     }
 
     #[test]
+    fn test_get_ingredients_from_hash() {
+        let mongo_rep = init_repo("lfb");
+        let ingredients: Vec<Ingredient> = mongo_rep
+            .get_ingredients_by_hash(vec![
+                "0x8574ea6bd913dd9b95296e9e5cede2d361f64f9b4a2f641b5fae3a2948be331e",
+                "0xbb46ee301b409e685fdca2667a94deffe378f7081edb25cee0386dc0cd5c2aca",
+            ])
+            .unwrap();
+        // dbg!(ingredients)
+        assert_eq!(ingredients[0].domain, "abricot.eth");
+        assert_eq!(ingredients[1].domain, "agaragar.eth");
+    }
+
+    #[test]
     #[should_panic(expected = "IncorrectIngredientsLength")]
     fn test_get_recipe_incorrect_ingredients_list_length() {
         let mongo_rep = init_repo("lfb");
@@ -233,16 +247,17 @@ mod tests {
     }
 
     #[test]
-    fn test_get_ingredients_from_hash() {
+    fn test_add_recipe_passes() {
         let mongo_rep = init_repo("lfb");
-        let ingredients: Vec<Ingredient> = mongo_rep
-            .get_ingredients_by_hash(vec![
-                "0x8574ea6bd913dd9b95296e9e5cede2d361f64f9b4a2f641b5fae3a2948be331e",
-                "0xbb46ee301b409e685fdca2667a94deffe378f7081edb25cee0386dc0cd5c2aca",
-            ])
+        let ingredients = mongo_rep
+            .get_ingredients(vec!["abricot.eth", "ail.eth", "aiguillettedecanard.eth"])
             .unwrap();
-        // dbg!(ingredients)
-        assert_eq!(ingredients[0].domain, "abricot.eth");
-        assert_eq!(ingredients[1].domain, "agaragar.eth");
+        assert!(mongo_rep
+            .add_recipe(
+                "0x1245425523",
+                ingredients.iter().map(|x| x.hash.as_str()).collect(),
+                1234,
+            )
+            .unwrap());
     }
 }
