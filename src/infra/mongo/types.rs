@@ -19,7 +19,7 @@ pub struct Recipe {
     pub address: String,
     pub status: Status,
     pub ingredients: Vec<DbIngredient>,
-    pub last_block: u32,
+    pub last_block: i64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
