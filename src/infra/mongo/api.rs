@@ -1,4 +1,4 @@
-use super::types::{DbIngredient, Ingredient, Recipe, Status};
+use super::types::{Ingredient, Recipe};
 use mongodb::{
     bson::{doc, oid::ObjectId},
     error::Error as mongoError,
@@ -124,6 +124,17 @@ impl MongoRep {
         match cursor.collect::<Result<Vec<Recipe>, mongoError>>() {
             Ok(v) => Ok(v),
             Err(e) => Err(MongoRepError::InvalidIngredientsList()),
+        }
+    }
+
+    pub fn get_recipes_ongoing(&self) -> Result<Vec<Recipe>, MongoRepError> {
+        let cursor = self
+            .recipes
+            .find(doc! {"status": "Ongoing"}, None)
+            .map_err(MongoRepError::from)?;
+        match cursor.collect::<Result<Vec<Recipe>, mongoError>>() {
+            Ok(v) => Ok(v),
+            Err(e) => Err(MongoRepError::QueryError(e)),
         }
     }
 
@@ -268,6 +279,14 @@ mod tests {
             .unwrap();
         assert_eq!(recipe[0].address, "0x12345");
         assert_eq!(recipe[0].status, Status::Ongoing);
+    }
+
+    #[test]
+    fn test_get_recipe_ongoing_passes() {
+        let mongo_rep = init_repo("lfb");
+        let recipe = mongo_rep.get_recipes_ongoing().unwrap();
+        assert_eq!("0x1245425523", recipe[0].address);
+        assert_eq!(Status::Ongoing, recipe[0].status);
     }
 
     #[test]
