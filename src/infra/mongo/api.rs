@@ -136,7 +136,7 @@ impl MongoRep {
         let ingredients = self.get_ingredients_by_hash(hashes).unwrap_or_default();
         let ingredients: Vec<mongodb::bson::Document> = ingredients
             .iter()
-            .map(|x| doc! {"id": x.id.unwrap(), "status": "Ongoing"})
+            .map(|x| doc! {"id": x.id.unwrap(), "status": "Ongoing", "owner": ""})
             .collect();
 
         let mut option = UpdateOptions::default();
@@ -159,6 +159,7 @@ impl MongoRep {
         &self,
         address: &str,
         hash: &str,
+        owner: &str,
         block: i64,
     ) -> Result<bool, MongoRepError> {
         let ingredient = &self.get_ingredients_by_hash(vec![hash])?[0];
@@ -166,7 +167,7 @@ impl MongoRep {
             .recipes
             .update_one(
                 doc! {"address": address.to_string(), "ingredients.id": ingredient.id},
-                doc! {"$set": {"last_block": block, "ingredients.$.status": "Completed"}},
+                doc! {"$set": {"last_block": block, "ingredients.$.status": "Completed", "ingredients.$.owner": owner}},
                 None,
             )
             .map_err(MongoRepError::from)
@@ -291,6 +292,7 @@ mod tests {
             .update_recipe(
                 "0x1245425523",
                 "0x8574ea6bd913dd9b95296e9e5cede2d361f64f9b4a2f641b5fae3a2948be331e",
+                "tim",
                 12345,
             )
             .unwrap());
