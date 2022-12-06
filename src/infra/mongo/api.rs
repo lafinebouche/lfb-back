@@ -1,4 +1,4 @@
-use super::types::{Ingredient, Recipe};
+use super::types::{Ingredient, Recipe, Status};
 use mongodb::{
     bson::{doc, oid::ObjectId},
     error::Error as mongoError,
@@ -127,6 +127,13 @@ impl MongoRep {
         }
     }
 
+    pub fn get_recipe(&self, address: &str) -> Result<Recipe, MongoRepError> {
+        match self.recipes.find_one(doc! {"address": address}, None) {
+            Ok(v) => Ok(v.unwrap()),
+            Err(e) => Err(MongoRepError::QueryError(e)),
+        }
+    }
+
     pub fn get_recipes_ongoing(&self) -> Result<Vec<Recipe>, MongoRepError> {
         let cursor = self
             .recipes
@@ -179,6 +186,30 @@ impl MongoRep {
             .update_one(
                 doc! {"address": address.to_string(), "ingredients.id": ingredient.id},
                 doc! {"$set": {"last_block": block, "ingredients.$.status": "Completed", "ingredients.$.owner": owner}},
+                None,
+            )
+            .map_err(MongoRepError::from)
+        {
+            Ok(_) => Ok(true),
+            Err(_) => Err(MongoRepError::InvalidUpdate(address.to_string())),
+        }
+    }
+
+    pub fn update_recipe_completed(&self, address: &str) -> Result<bool, MongoRepError> {
+        let recipe = self.get_recipe(address)?;
+        let completed = recipe
+            .ingredients
+            .into_iter()
+            .map(|x| x.status == Status::Completed)
+            .fold(true, |acc, x| acc && x);
+        if !completed {
+            return Ok(false);
+        }
+        match self
+            .recipes
+            .update_one(
+                doc! {"address": address.to_string()},
+                doc! {"$set": {"status": "Completed"}},
                 None,
             )
             .map_err(MongoRepError::from)
@@ -274,6 +305,15 @@ mod tests {
     #[test]
     fn test_get_recipe_passes() {
         let mongo_rep = init_repo("lfb");
+        assert_eq!(
+            "0x1245425523",
+            mongo_rep.get_recipe("0x1245425523").unwrap().address
+        );
+    }
+
+    #[test]
+    fn test_get_recipes_passes() {
+        let mongo_rep = init_repo("lfb");
         let recipe = mongo_rep
             .get_recipes(vec!["agaragar.eth", "asperge.eth"])
             .unwrap();
@@ -315,5 +355,13 @@ mod tests {
                 12345,
             )
             .unwrap());
+    }
+
+    #[test]
+    fn test_update_recipe_completed_passes() {
+        let mongo_rep = init_repo("lfb");
+        mongo_rep.update_recipe_completed("0x1245425523").unwrap();
+        let recipe = mongo_rep.get_recipe("0x1245425523").unwrap();
+        assert_eq!(Status::Completed, recipe.status);
     }
 }
