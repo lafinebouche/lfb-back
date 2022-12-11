@@ -2,7 +2,7 @@ use super::types::{Ingredient, Recipe, Status};
 use mongodb::{
     bson::{doc, oid::ObjectId},
     error::Error as mongoError,
-    options::UpdateOptions,
+    options::{FindOptions, UpdateOptions},
     results::InsertOneResult,
     sync::Client,
 };
@@ -199,6 +199,20 @@ impl MongoRep {
             Err(_) => Err(MongoRepError::InvalidUpdate(address.to_string())),
         }
     }
+    pub fn get_last_block(&self) -> Result<i64, MongoRepError> {
+        let find_options = FindOptions::builder()
+            .sort(doc! {"last_block": -1})
+            .limit(1)
+            .build();
+        let cursor = self
+            .recipes
+            .find(doc! {}, find_options)
+            .map_err(MongoRepError::from)?;
+        match cursor.collect::<Result<Vec<Recipe>, mongoError>>() {
+            Ok(v) => Ok(v.first().unwrap().last_block),
+            Err(e) => Err(MongoRepError::QueryError(e)),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -354,4 +368,28 @@ mod tests {
     //     let recipe = mongo_rep.get_recipe("0x1245425523").unwrap();
     //     assert_eq!(Status::Completed, recipe.status);
     // }
+
+    #[test]
+    fn test_last_block_passes() {
+        let mongo_rep = init_repo("lfb");
+        let ingredients = mongo_rep
+            .get_ingredients(vec![
+                "abricot.eth",
+                "ail.eth",
+                "agaragar.eth",
+                "aiguillettedecanard.eth",
+            ])
+            .unwrap();
+        assert!(mongo_rep
+            .add_recipe(
+                "0x1245425524",
+                ingredients.iter().map(|x| x.hash.as_str()).collect(),
+                12348,
+            )
+            .unwrap());
+        let last_block = mongo_rep.get_last_block().unwrap();
+        println!("hello");
+        println!("{}", last_block);
+        assert_eq!(last_block, 12348);
+    }
 }
