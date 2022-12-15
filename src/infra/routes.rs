@@ -16,9 +16,23 @@ pub fn get_ingredient(db: &State<MongoRep>, name: &str) -> Result<Json<Ingredien
     }
 }
 
+#[get("/ingredients/<ids>")]
+pub fn get_ingredients_by_id(
+    db: &State<MongoRep>,
+    ids: &str,
+) -> Result<Json<Vec<Ingredient>>, Status> {
+    let ids = ids.split(',').collect();
+    let result = db.get_ingredients_by_id(ids);
+
+    match result {
+        Ok(ingredients) => Ok(Json(ingredients)),
+        Err(MongoRepError::IncorrectIngredientsLength(_)) => Err(Status::BadRequest),
+        Err(_) => Err(Status::InternalServerError),
+    }
+}
+
 #[get("/recipes/<names>")]
 pub fn get_recipes(db: &State<MongoRep>, names: &str) -> Result<Json<Vec<Recipe>>, Status> {
-    println!("{}", names);
     let names = names.split(',').collect();
     let result = db.get_recipes(names);
 

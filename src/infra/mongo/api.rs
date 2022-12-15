@@ -6,6 +6,7 @@ use mongodb::{
     results::InsertOneResult,
     sync::Client,
 };
+use std::str::FromStr;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -79,6 +80,22 @@ impl MongoRep {
         let cursor = self
             .ingredients
             .find(doc! {"hash": {"$in" : hashes}}, None)
+            .map_err(MongoRepError::from)?;
+        match cursor.collect::<Result<Vec<Ingredient>, mongoError>>() {
+            Ok(v) => Ok(v),
+            Err(e) => Err(MongoRepError::InvalidIngredientHash()),
+        }
+    }
+
+    pub fn get_ingredients_by_id(&self, ids: Vec<&str>) -> Result<Vec<Ingredient>, MongoRepError> {
+        let ids: Vec<ObjectId> = ids
+            .into_iter()
+            .map(|x| ObjectId::from_str(x).unwrap())
+            .collect::<Vec<ObjectId>>();
+
+        let cursor = self
+            .ingredients
+            .find(doc! {"_id": {"$in" : ids}}, None)
             .map_err(MongoRepError::from)?;
         match cursor.collect::<Result<Vec<Ingredient>, mongoError>>() {
             Ok(v) => Ok(v),
