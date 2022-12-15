@@ -2,10 +2,10 @@ use super::types::{Ingredient, Recipe, Status};
 use mongodb::{
     bson::{doc, oid::ObjectId},
     error::Error as mongoError,
-    options::UpdateOptions,
-    results::InsertOneResult,
+    options::{FindOptions, UpdateOptions},
     sync::Client,
 };
+use std::str::FromStr;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -46,26 +46,6 @@ impl MongoRep {
         return Ok(rep);
     }
 
-    pub fn add_ingredient_mock(&self, domain: &str) -> Result<InsertOneResult, MongoRepError> {
-        let new_ingredient = Ingredient {
-            id: None,
-            domain: domain.to_string(),
-            hash: "random_hash".to_string(),
-            path: ["random_path".to_string()].to_vec(),
-        };
-
-        match self
-            .ingredients
-            .insert_one(new_ingredient, None)
-            .map_err(MongoRepError::from)
-        {
-            Ok(result) => Ok(result),
-            Err(_) => Err(MongoRepError::InvalidAddIngredient(String::from(
-                domain.to_string(),
-            ))),
-        }
-    }
-
     pub fn get_ingredient(&self, name: &str) -> Result<Ingredient, MongoRepError> {
         match self
             .ingredients
@@ -86,7 +66,8 @@ impl MongoRep {
             .find(doc! {"domain": {"$in": ingredients}}, None)
             .map_err(MongoRepError::from)?;
         match cursor.collect::<Result<Vec<Ingredient>, mongoError>>() {
-            Ok(v) => Ok(v),
+            Ok(v) if v.len() > 0 => Ok(v),
+            Ok(_) => Err(MongoRepError::EmptyResponse()),
             _ => Err(MongoRepError::InvalidIngredientsList()),
         }
     }
@@ -98,6 +79,22 @@ impl MongoRep {
         let cursor = self
             .ingredients
             .find(doc! {"hash": {"$in" : hashes}}, None)
+            .map_err(MongoRepError::from)?;
+        match cursor.collect::<Result<Vec<Ingredient>, mongoError>>() {
+            Ok(v) => Ok(v),
+            Err(e) => Err(MongoRepError::InvalidIngredientHash()),
+        }
+    }
+
+    pub fn get_ingredients_by_id(&self, ids: Vec<&str>) -> Result<Vec<Ingredient>, MongoRepError> {
+        let ids: Vec<ObjectId> = ids
+            .into_iter()
+            .map(|x| ObjectId::from_str(x).unwrap())
+            .collect::<Vec<ObjectId>>();
+
+        let cursor = self
+            .ingredients
+            .find(doc! {"_id": {"$in" : ids}}, None)
             .map_err(MongoRepError::from)?;
         match cursor.collect::<Result<Vec<Ingredient>, mongoError>>() {
             Ok(v) => Ok(v),
@@ -247,6 +244,21 @@ impl MongoRep {
             _ => Err(MongoRepError::EmptyResponse()),
         }
     }
+
+    pub fn get_last_block(&self) -> Result<i64, MongoRepError> {
+        let find_options = FindOptions::builder()
+            .sort(doc! {"last_block": -1})
+            .limit(1)
+            .build();
+        let cursor = self
+            .recipes
+            .find(doc! {}, find_options)
+            .map_err(MongoRepError::from)?;
+        match cursor.collect::<Result<Vec<Recipe>, mongoError>>() {
+            Ok(v) => Ok(v.first().unwrap().last_block),
+            Err(e) => Err(MongoRepError::QueryError(e)),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -270,18 +282,6 @@ mod tests {
     fn test_get_ingredient_invalid_ingredient_query() {
         let mongo_rep = init_repo("lfb");
         mongo_rep.get_ingredient("hello.eth").unwrap();
-    }
-
-    #[test]
-    fn test_get_ingredient_passes() {
-        let mongo_rep = init_repo("lfb");
-        let insert = mongo_rep.add_ingredient_mock("abricot.eth").unwrap();
-        let ingredient = mongo_rep.get_ingredient("abricot.eth").unwrap();
-        assert_eq!("abricot.eth", ingredient.domain);
-        assert_eq!(
-            insert.inserted_id.as_object_id().unwrap(),
-            ingredient.id.unwrap()
-        )
     }
 
     #[test]
@@ -344,9 +344,9 @@ mod tests {
     fn test_get_recipes_passes() {
         let mongo_rep = init_repo("lfb");
         let recipe = mongo_rep
-            .get_recipes(vec!["agaragar.eth", "asperge.eth"])
+            .get_recipes(vec!["abricot.eth", "ail.eth"])
             .unwrap();
-        assert_eq!(recipe[0].address, "0x12345");
+        assert_eq!(recipe[0].address, "0x1245425523");
         assert_eq!(recipe[0].status, Status::Ongoing);
     }
 
@@ -374,8 +374,9 @@ mod tests {
     }
 
     #[test]
-    fn test_update_recipe_passes() {
+    fn test_update_recipe_and_complete_passes() {
         let mongo_rep = init_repo("lfb");
+        // update all ingredients of recipe 0x1245425523
         assert!(mongo_rep
             .update_recipe(
                 "0x1245425523",
@@ -384,11 +385,23 @@ mod tests {
                 12345,
             )
             .unwrap());
-    }
+        assert!(mongo_rep
+            .update_recipe(
+                "0x1245425523",
+                "0x3e72143cf7e2a5dd27e9d0ad6bd7f09d98b983f9b05e3e57a07d37b385a9504a",
+                "alice",
+                12346,
+            )
+            .unwrap());
+        assert!(mongo_rep
+            .update_recipe(
+                "0x1245425523",
+                "0x659ede6c695c50ddd8eb948402f1d4164a77fc60d84b7e473eb9058b40444821",
+                "bob",
+                12347,
+            )
+            .unwrap());
 
-    #[test]
-    fn test_update_recipe_completed_passes() {
-        let mongo_rep = init_repo("lfb");
         mongo_rep.update_recipe_completed("0x1245425523").unwrap();
         let recipe = mongo_rep.get_recipe("0x1245425523").unwrap();
         assert_eq!(Status::Completed, recipe.status);
@@ -400,5 +413,27 @@ mod tests {
         let leaderboard = mongo_rep.get_leaderboard();
         // TODO update to assert_eq!
         dbg!(leaderboard);
+    }
+
+    #[test]
+    fn test_last_block_passes() {
+        let mongo_rep = init_repo("lfb");
+        let ingredients = mongo_rep
+            .get_ingredients(vec![
+                "abricot.eth",
+                "ail.eth",
+                "agaragar.eth",
+                "aiguillettedecanard.eth",
+            ])
+            .unwrap();
+        assert!(mongo_rep
+            .add_recipe(
+                "0x1245425524",
+                ingredients.iter().map(|x| x.hash.as_str()).collect(),
+                12348,
+            )
+            .unwrap());
+        let last_block = mongo_rep.get_last_block().unwrap();
+        assert_eq!(last_block, 12348);
     }
 }
