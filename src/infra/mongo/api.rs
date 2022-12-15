@@ -218,6 +218,35 @@ impl MongoRep {
             Err(_) => Err(MongoRepError::InvalidUpdate(address.to_string())),
         }
     }
+
+    pub fn get_leaderboard(&self) -> Result<Vec<(String, u32)>, MongoRepError> {
+        let cursor = self.recipes.aggregate(
+            vec![
+                doc! {"$unwind": "$ingredients"},
+                doc! {"$match": {"ingredients.status": "Completed"}},
+                doc! {"$group": {
+                  "_id": "$ingredients.owner",
+                  "count": {
+                    "$sum": 1
+                  }
+                }},
+            ],
+            None,
+        )?;
+        match cursor
+            .map(|x| {
+                let doc = x.unwrap_or_default();
+                (
+                    doc.get_str("_id").unwrap().to_string(),
+                    doc.get_i32("count").unwrap() as u32,
+                )
+            })
+            .collect::<Vec<(String, u32)>>()
+        {
+            v => Ok(v),
+            _ => Err(MongoRepError::EmptyResponse()),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -363,5 +392,13 @@ mod tests {
         mongo_rep.update_recipe_completed("0x1245425523").unwrap();
         let recipe = mongo_rep.get_recipe("0x1245425523").unwrap();
         assert_eq!(Status::Completed, recipe.status);
+    }
+
+    #[test]
+    fn test_get_leaderboard() {
+        let mongo_rep = init_repo("lfb");
+        let leaderboard = mongo_rep.get_leaderboard();
+        // TODO update to assert_eq!
+        dbg!(leaderboard);
     }
 }
