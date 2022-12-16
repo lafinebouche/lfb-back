@@ -245,6 +245,38 @@ impl MongoRep {
         }
     }
 
+    pub fn get_statistics(&self, address: &str) -> Result<Vec<(u32, u32)>, MongoRepError> {
+        let cursor = self.recipes.aggregate(
+            vec![
+                doc! {"$unwind": "$ingredients"},
+                doc! {"$match": {"ingredients.status": "Completed", "ingredients.owner": address}},
+                doc! {"$group": {
+                  "_id": "$address",
+                  "ingredients": { "$sum": 1 }
+                }},
+                doc! {"$group": {
+                    "_id": null,
+                    "recipes": { "$sum": 1 },
+                    "ingredients": { "$sum": "$ingredients" }
+                }},
+            ],
+            None,
+        )?;
+        match cursor
+            .map(|x| {
+                let doc = x.unwrap_or_default();
+                (
+                    doc.get_i32("recipes").unwrap() as u32,
+                    doc.get_i32("ingredients").unwrap() as u32,
+                )
+            })
+            .collect::<Vec<(u32, u32)>>()
+        {
+            v => Ok(v),
+            _ => Err(MongoRepError::EmptyResponse()),
+        }
+    }
+
     pub fn get_last_block(&self) -> Result<i64, MongoRepError> {
         let find_options = FindOptions::builder()
             .sort(doc! {"last_block": -1})
@@ -410,9 +442,19 @@ mod tests {
     #[test]
     fn test_get_leaderboard() {
         let mongo_rep = init_repo("lfb");
-        let leaderboard = mongo_rep.get_leaderboard();
+        let leaderboard = mongo_rep.get_leaderboard().unwrap();
         // TODO update to assert_eq!
         dbg!(leaderboard);
+    }
+
+    #[test]
+    fn test_get_statistics() {
+        let mongo_rep = init_repo("lfb");
+        let stats = mongo_rep
+            .get_statistics("0xc5e4ec0073631fa872334749381e4d514da130f8")
+            .unwrap();
+        // TODO update to assert_eq!
+        dbg!(stats[0]);
     }
 
     #[test]
