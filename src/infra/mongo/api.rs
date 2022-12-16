@@ -255,6 +255,7 @@ impl MongoRep {
             .find(doc! {}, find_options)
             .map_err(MongoRepError::from)?;
         match cursor.collect::<Result<Vec<Recipe>, mongoError>>() {
+            Ok(v) if v.len() == 0 => Ok(0),
             Ok(v) => Ok(v.first().unwrap().last_block),
             Err(e) => Err(MongoRepError::QueryError(e)),
         }
@@ -277,6 +278,12 @@ mod tests {
         init_repo("test");
     }
 
+    #[test]
+    fn test_get_last_block_without_data() {
+        let mongo_rep = init_repo("lfb");
+        let block = mongo_rep.get_last_block().unwrap();
+        assert_eq!(block, 0);
+    }
     #[test]
     #[should_panic(expected = "InvalidIngredientName")]
     fn test_get_ingredient_invalid_ingredient_query() {
