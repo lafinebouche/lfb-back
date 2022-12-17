@@ -16,6 +16,26 @@ pub fn get_ingredient(db: &State<MongoRep>, name: &str) -> Result<Json<Ingredien
     }
 }
 
+#[get("/statistics/<addr>")]
+pub fn get_statistics(db: &State<MongoRep>, addr: &str) -> Result<Json<Vec<(u32, u32)>>, Status> {
+    let stats = db.get_statistics(addr);
+
+    match stats {
+        Ok(stats) => Ok(Json(stats)),
+        Err(_) => Err(Status::InternalServerError),
+    }
+}
+
+#[get("/leaderboard")]
+pub fn get_leaderboard(db: &State<MongoRep>) -> Result<Json<Vec<(String, u32)>>, Status> {
+    let leaderboard = db.get_leaderboard();
+
+    match leaderboard {
+        Ok(leaderboard) => Ok(Json(leaderboard)),
+        Err(_) => Err(Status::InternalServerError),
+    }
+}
+
 #[get("/ingredients/<ids>")]
 pub fn get_ingredients_by_id(
     db: &State<MongoRep>,

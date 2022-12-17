@@ -35,7 +35,13 @@ fn rocket() -> _ {
         .manage(db)
         .mount(
             "/",
-            routes![get_ingredient, get_recipes, get_ingredients_by_id],
+            routes![
+                get_ingredient,
+                get_recipes,
+                get_ingredients_by_id,
+                get_leaderboard,
+                get_statistics
+            ],
         )
         .attach(CORS)
 }
