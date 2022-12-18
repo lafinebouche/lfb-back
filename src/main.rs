@@ -1,8 +1,10 @@
 mod infra;
+use std::net::Ipv4Addr;
+
 use infra::*;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::Header;
-use rocket::{Request, Response};
+use rocket::{Config, Request, Response};
 
 #[macro_use]
 extern crate rocket;
@@ -30,9 +32,18 @@ impl Fairing for CORS {
 
 #[launch]
 fn rocket() -> _ {
-    let db = MongoRep::init("mongodb://localhost:27017/".to_string(), "lfb").unwrap();
+    let db = MongoRep::init(
+        dotenv::var("MONGO_URI").expect("MONGO_URI must be set"),
+        "lfb",
+    )
+    .unwrap();
+    let config = Config {
+        address: Ipv4Addr::new(0, 0, 0, 0).into(),
+        ..Config::debug_default()
+    };
     rocket::build()
         .manage(db)
+        .configure(&config)
         .mount(
             "/",
             routes![
