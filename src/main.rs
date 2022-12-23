@@ -2,6 +2,8 @@ mod infra;
 use std::net::Ipv4Addr;
 
 use infra::*;
+
+use rocket::config::{CipherSuite, TlsConfig};
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::Header;
 use rocket::{Config, Request, Response};
@@ -37,10 +39,13 @@ fn rocket() -> _ {
         "lfb",
     )
     .unwrap();
-    let config = Config {
-        address: Ipv4Addr::new(0, 0, 0, 0).into(),
-        ..Config::debug_default()
-    };
+    let mut config = Config::debug_default();
+    config.address = Ipv4Addr::new(0, 0, 0, 0).into();
+    config.port = 8000;
+    let tls_config = TlsConfig::from_paths("./certCA.pem", "keyCA.pem")
+        .with_ciphers(CipherSuite::TLS_V13_SET)
+        .with_preferred_server_cipher_order(true);
+    config.tls = Some(tls_config);
     rocket::build()
         .manage(db)
         .configure(&config)
