@@ -10,7 +10,7 @@ repository = "https://github.com/greged93/lfb-back"
 version = "0.0.1"
 
 [dependencies]
-rocket = {version="0.5.0-rc.2", features=["json"]}
+rocket = {version="0.5.0-rc.2", features=["json", "tls"]}
 serde = "1.0.147" # Used in the Map Data into Structs section
 thiserror = "1.0.37"
 merkletree = "0.22.1"
