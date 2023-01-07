@@ -51,6 +51,15 @@ pub fn get_ingredients_by_id(
     }
 }
 
+#[get("/ongoing-recipes")]
+pub fn get_ongoing_recipes(db: &State<MongoRep>) -> Result<Json<Vec<Recipe>>, Status> {
+    let result = db.get_recipes_ongoing();
+    match result {
+        Ok(recipes) => Ok(Json(recipes)),
+        Err(_) => Err(Status::InternalServerError),
+    }
+}
+
 #[get("/recipes/<names>")]
 pub fn get_recipes(db: &State<MongoRep>, names: &str) -> Result<Json<Vec<Recipe>>, Status> {
     let names = names.split(',').collect();

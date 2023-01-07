@@ -56,7 +56,8 @@ fn rocket() -> _ {
                 get_recipes,
                 get_ingredients_by_id,
                 get_leaderboard,
-                get_statistics
+                get_statistics,
+                get_ongoing_recipes
             ],
         )
         .attach(CORS)
