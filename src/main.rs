@@ -42,7 +42,7 @@ fn rocket() -> _ {
     let mut config = Config::debug_default();
     config.address = Ipv4Addr::new(0, 0, 0, 0).into();
     config.port = 8000;
-    let tls_config = TlsConfig::from_paths("./certCA.pem", "keyCA.pem")
+    let tls_config = TlsConfig::from_paths("./fullchain1.pem", "privkey1.pem")
         .with_ciphers(CipherSuite::TLS_V13_SET)
         .with_preferred_server_cipher_order(true);
     config.tls = Some(tls_config);

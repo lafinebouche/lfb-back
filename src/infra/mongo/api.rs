@@ -222,10 +222,13 @@ impl MongoRep {
                 doc! {"$unwind": "$ingredients"},
                 doc! {"$match": {"ingredients.status": "Completed"}},
                 doc! {"$group": {
-                  "_id": "$ingredients.owner",
-                  "count": {
-                    "$sum": 1
-                  }
+                "_id": "$ingredients.owner",
+                "count": {
+                  "$sum": 1
+                }}},
+                doc! { "$limit" : 20},
+                doc! {"$sort" : {
+                "count" : -1
                 }},
             ],
             None,
